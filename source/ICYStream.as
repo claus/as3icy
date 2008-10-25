@@ -1,6 +1,7 @@
 ﻿package com.aupeo.as3icy 
 {
-	import com.aupeo.as3icy.events.ICYFrameDataEvent;
+	import com.aupeo.as3icy.data.MPEGFrame;
+	import com.aupeo.as3icy.events.ICYFrameEvent;
 	import com.aupeo.as3icy.events.ICYMetaDataEvent;
 	
 	import com.aupeo.utils.StringUtils;
@@ -13,26 +14,12 @@
 	
 	public class ICYStream extends EventDispatcher
 	{
-		protected static var mpegBitrates:Array = 
-		[
-			[	
-				[0, 32, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448, -1],
-				[0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, -1],
-				[0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, -1]
-			],[
-				[0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256, -1],
-				[0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, -1],
-				[0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, -1]
-			]
-		];
-		protected static var mpegSamplingRates:Array = 
-		[
-			[44100, 48000, 32000],
-			[22050, 24000, 16000],
-			[11025, 12000, 8000]
-		];
-		
 		protected var stream:URLStream;
+		
+		protected var _mpegFrame:MPEGFrame;
+		
+		protected var headerIndex:uint = 0;
+		protected var crcIndex:uint = 0;
 		
 		protected var _meta:String = "";
 		protected var _framesLoaded:uint = 0;
@@ -51,19 +38,6 @@
 		protected var _icyPublish:Boolean = false;
 		protected var _icyServer:String = "";
 		
-		protected var _mpegVersion:uint;
-		protected var _mpegLayer:uint;
-		protected var _mpegHasCRC:Boolean;
-		protected var _mpegCRC:uint;
-		protected var _mpegBitrate:uint;
-		protected var _mpegSamplingRate:uint;
-		protected var _mpegPadding:Boolean;
-		protected var _mpegChannelMode:uint;
-		protected var _mpegChannelModeExt:uint;
-		protected var _mpegCopyright:Boolean;
-		protected var _mpegOriginal:Boolean;
-		protected var _mpegEmphasis:uint;
-
 		protected var readFunc:Function = readIdle;
 		protected var readFuncContinue:Function;
 		
@@ -71,11 +45,9 @@
 		protected var icyCRReceived:Boolean = false;
 		protected var icyCRLFCount:uint = 0;
 
-		protected var mpegFrameLength:uint;
-
 		protected var read:uint = 0;
+		protected var paused:Boolean = false;
 		protected var frameDataTmp:ByteArray;
-		protected var frameCRCTmp:ByteArray;
 
 		
 		public function ICYStream() 
@@ -83,13 +55,18 @@
 			stream = new URLStream();
 			stream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
 			stream.addEventListener(ProgressEvent.PROGRESS, progressHandler);
+			stream.addEventListener(Event.COMPLETE, completeHandler);
+			stream.addEventListener(IOErrorEvent.IO_ERROR, defaultHandler);
+			stream.addEventListener(SecurityErrorEvent.SECURITY_ERROR, defaultHandler);
+			stream.addEventListener(HTTPStatusEvent.HTTP_STATUS, defaultHandler);
+			stream.addEventListener(Event.OPEN, defaultHandler);
 		}
 		
 		
 		public function load(request:URLRequest):void {
+			_mpegFrame = new MPEGFrame();
 			read = 0;
 			frameDataTmp = null;
-			frameCRCTmp = null;
 			icyHeader = null;
 			icyCRReceived = false;
 			icyCRLFCount = 0;
@@ -104,7 +81,17 @@
 			stream.close();
 		}
 		
+		public function resume():void {
+			if (paused && stream.connected) {
+				paused = false;
+				readFunc = readFrameHeader;
+				readLoop();
+			}
+		}
+		
 
+		public function get mpegFrame():MPEGFrame { return _mpegFrame; }
+		
 		public function get framesLoaded():uint { return _framesLoaded; }
 		public function get metaDataLoaded():uint { return _metaDataLoaded; }
 		public function get metaDataBytesLoaded():uint { return _metaDataBytesLoaded; }
@@ -119,19 +106,6 @@
 		public function get icyPublish():Boolean { return _icyPublish; }
 		public function get icyServer():String { return _icyServer; }
 
-		public function get mpegVersion():uint { return _mpegVersion; }
-		public function get mpegLayer():uint { return _mpegLayer; }
-		public function get mpegHasCRC():Boolean { return _mpegHasCRC; }
-		public function get mpegCRC():uint { return _mpegCRC; }
-		public function get mpegBitrate():uint { return _mpegBitrate; }
-		public function get mpegSamplingRate():uint { return _mpegSamplingRate; }
-		public function get mpegPadding():Boolean { return _mpegPadding; }
-		public function get mpegChannelMode():uint { return _mpegChannelMode; }
-		public function get mpegChannelModeExt():uint { return _mpegChannelModeExt; }
-		public function get mpegCopyright():Boolean { return _mpegCopyright; }
-		public function get mpegOriginal():Boolean { return _mpegOriginal; }
-		public function get mpegEmphasis():uint { return _mpegEmphasis; }
-		
 		
 		protected function set meta(value:String):void {
 			_meta = value;
@@ -145,19 +119,24 @@
 			if (e.responseHeaders.length > 0) {
 				processResponseHeaders(e.responseHeaders);
 				dispatchEvent(e.clone());
-				readFunc = readFrameHeader0;
+				readFunc = readFrameHeader;
 			} else {
-				// no response headers probably means that we're dealing with
+				// no response headers probably mean that we're dealing with
 				// fucked up non-http ICY responses (ICY 200 OK), so we have to  
-				// manually parse the headers
+				// manually parse the headers. Well, ok then.
 				responseUrl = e.responseURL;
 				icyHeader = new ByteArray();
 				readFunc = readNonHttpIcyHeaderOmgWtfLol;
 			}
 		}
 		
+		protected function completeHandler(e:Event):void {
+			dispatchEvent(e.clone());
+		}
+		
 		protected function progressHandler(e:ProgressEvent):void {
-			if (readLoop()) {
+			dispatchEvent(e.clone());
+			if (!paused && readLoop()) {
 				close();
 			}
 		}
@@ -203,27 +182,31 @@
 					e.responseHeaders = responseHeaders;
 					e.responseURL = responseUrl;
 					dispatchEvent(e);
-					readFunc = readFrameHeader0;
+					readFunc = readFrameHeader;
 					break;
 				}
 			}
 			return true;
 		}
 		
-		protected function readFrameHeader0():Boolean {
+		protected function readFrameHeader():Boolean {
 			var ret:Boolean = true;
 			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read > icyMetaInterval) {
-						readFuncContinue = readFrameHeader0;
-						readFunc = readMetaDataSize;
-						return ret;
+				if (icyMetaInterval > 0 && ++read > icyMetaInterval) {
+					readFuncContinue = readFrameHeader;
+					readFunc = readMetaDataSize;
+					return ret;
+				}
+				try {
+					mpegFrame.setHeaderByteAt(headerIndex, stream.readUnsignedByte());
+					if (++headerIndex == 4) {
+						readFunc = mpegFrame.hasCRC ? readCRC : readFrame;
+						headerIndex = 0;
 					}
 				}
-				if (stream.readUnsignedByte() == 0xff) {
-					readFunc = readFrameHeader1;
-				} else {
-					//trace("readFrameHeader0: no frame header");
+				catch (e:Error) {
+					//trace(e.message);
+					headerIndex = 0;
 				}
 			} else {
 				ret = false;
@@ -231,172 +214,26 @@
 			return ret;
 		}
 		
-		protected function readFrameHeader1():Boolean {
+		protected function readCRC():Boolean {
 			var ret:Boolean = true;
 			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read > icyMetaInterval) {
-						readFuncContinue = readFrameHeader1;
-						readFunc = readMetaDataSize;
-						return ret;
-					}
-				}
-				var b:uint = stream.readUnsignedByte();
-				if ((b & 0xe0) != 0xe0) {
-					//trace("readFrameHeader1: no frame header");
-					readFunc = readFrameHeader0;
+				if (icyMetaInterval > 0 && ++read > icyMetaInterval) {
+					readFuncContinue = readCRC;
+					readFunc = readMetaDataSize;
 					return ret;
 				}
-				// this appears to be a valid mpeg frame header, so proceed.
-				// get the mpeg version
-				// for now we only support mpeg 1.0
-				var mpegVersionBits:uint = (b & 0x18) >> 3;
-				if (mpegVersionBits == 3) {
-					_mpegVersion = 1;
-				} else {
-					//trace("readFrameHeader1: unsupported mpeg version");
-					readFunc = readFrameHeader0;
-					return ret;
-				}
-				// get the mpeg layer version
-				// for now we only support layer III
-				var mpegLayerBits:uint = (b & 0x06) >> 1;
-				if (mpegLayerBits == 1) {
-					_mpegLayer = 3;
-				} else {
-					//trace("readFrameHeader1: unsupported mpeg layer");
-					readFunc = readFrameHeader0;
-					return ret;
-				}
-				// is the frame secured by crc?
-				_mpegHasCRC = !((b & 0x01) != 0);
-				// proceed with third header byte
-				readFunc = readFrameHeader2;
-			} else {
-				ret = false;
-			}
-			return ret;
-		}
-		
-		protected function readFrameHeader2():Boolean {
-			var ret:Boolean = true;
-			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read > icyMetaInterval) {
-						readFuncContinue = readFrameHeader2;
-						readFunc = readMetaDataSize;
-						return ret;
+				try {
+					mpegFrame.setCRCByteAt(crcIndex, stream.readUnsignedByte());
+					if (++crcIndex == 2) {
+						readFunc = readFrame;
+						crcIndex = 0;
 					}
 				}
-				var b:uint = stream.readUnsignedByte();
-				var bitrateIndex:uint = ((b & 0xf0) >> 4);
-				// get the frame's bitrate
-				if (bitrateIndex == 0 || bitrateIndex == 0xf0) {
-					//trace("readFrameHeader2: unsupported bitrate index");
-					readFunc = readFrameHeader0;
-					return ret;
+				catch (e:Error) {
+					//trace(e.message);
+					readFunc = readFrameHeader;
+					crcIndex = 0;
 				}
-				_mpegBitrate = mpegBitrates[mpegVersion - 1][mpegLayer - 1][bitrateIndex];
-				// get the frame's samplingrate
-				var samplingrateIndex:uint = ((b & 0x0c) >> 2);
-				if (samplingrateIndex == 3) {
-					//trace("readFrameHeader2: unsupported samplingrate index");
-					readFunc = readFrameHeader0;
-					return ret;
-				}
-				_mpegSamplingRate = mpegSamplingRates[mpegVersion - 1][samplingrateIndex];
-				// is the frame padded?
-				_mpegPadding = ((b & 0x02) == 0x02);
-				// proceed with fourth and last header byte
-				readFunc = readFrameHeader3;
-			} else {
-				ret = false;
-			}
-			return ret;
-		}
-		
-		protected function readFrameHeader3():Boolean {
-			var ret:Boolean = true;
-			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read > icyMetaInterval) {
-						readFuncContinue = readFrameHeader3;
-						readFunc = readMetaDataSize;
-						return ret;
-					}
-				}
-				var b:uint = stream.readUnsignedByte();
-				// get the frame's channel mode:
-				// 0: stereo
-				// 1: joint stereo
-				// 2: dual channel
-				// 3: mono
-				_mpegChannelMode = ((b & 0xc0) >> 6);
-				// get the frame's extended channel mode (only for joint stereo):
-				_mpegChannelModeExt = ((b & 0x30) >> 4);
-				// get the copyright flag
-				_mpegCopyright = ((b & 0x08) == 0x08);
-				// get the original flag
-				_mpegOriginal = ((b & 0x04) == 0x04);
-				// get the emphasis:
-				// 0: none
-				// 1: 50/15 ms
-				// 2: reserved
-				// 3: ccit j.17
-				_mpegEmphasis = (b & 0x02);
-				// almost done
-				// calculate the frame length
-				mpegFrameLength = Math.floor(((mpegVersion == 1) ? 144000 : 72000) * mpegBitrate / mpegSamplingRate) - 4;
-				if (mpegPadding) {
-					mpegFrameLength++;
-				}
-				// proceed with either the crc (if present) or the actual frame data
-				readFunc = mpegCRC ? readCRC0 : readFrame;
-			} else {
-				ret = false;
-			}
-			return ret;
-		}
-		
-		protected function readCRC0():Boolean {
-			var ret:Boolean = true;
-			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read >= icyMetaInterval) {
-						readFuncContinue = readCRC0;
-						readFunc = readMetaDataSize;
-						return ret;
-					}
-				}
-				frameCRCTmp = new ByteArray();
-				stream.readBytes(frameCRCTmp, 0, 1);
-				// proceed with the actual frame data
-				readFunc = readCRC1;
-			} else {
-				ret = false;
-			}
-			return ret;
-		}
-
-		protected function readCRC1():Boolean {
-			var ret:Boolean = true;
-			if (stream.bytesAvailable >= 1) {
-				if (icyMetaInterval > 0) {
-					if (++read >= icyMetaInterval) {
-						readFuncContinue = readCRC1;
-						readFunc = readMetaDataSize;
-						return ret;
-					}
-				}
-				stream.readBytes(frameCRCTmp, 1, 1);
-				frameCRCTmp.position = 0;
-				_mpegCRC = frameCRCTmp.readUnsignedShort();
-				// CW:: TODO: not too sure about this.. 
-				// CW:: TODO: does the frame length include header/crc or not? seems weird but also seems to work like this
-				// CW:: TODO: see also readFrameHeader3(), i subtract 4 bytes (for the header) from the length there
-				mpegFrameLength -= 2;
-				// proceed with the actual frame data
-				readFunc = readFrame;
 			} else {
 				ret = false;
 			}
@@ -405,8 +242,8 @@
 
 		protected function readFrame():Boolean {
 			var ret:Boolean = true;
-			var len:uint = mpegFrameLength;
 			var readTmp:uint = read;
+			var len:uint = mpegFrame.size;
 			if (icyMetaInterval > 0) {
 				if (frameDataTmp != null) {
 					len -= frameDataTmp.length;
@@ -414,6 +251,13 @@
 				read += len;
 				if (read >= icyMetaInterval) {
 					len -= (read - icyMetaInterval);
+					if (len == 0) {
+						read = readTmp;
+						frameDataTmp = frameData;
+						readFuncContinue = readFrame;
+						readFunc = readMetaDataSize;
+						return ret;
+					}
 				}
 			}
 			if (stream.bytesAvailable >= len) {
@@ -431,8 +275,13 @@
 				} else {
 					_framesLoaded++;
 					frameDataTmp = null;
-					dispatchEvent(new ICYFrameDataEvent(ICYFrameDataEvent.FRAMEDATA, frameData));
-					readFunc = readFrameHeader0;
+					mpegFrame.data = frameData;
+					if (dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true))) {
+						readFunc = readFrameHeader;
+					} else {
+						paused = true;
+						ret = false;
+					}
 				}
 			} else {
 				read = readTmp;
@@ -451,7 +300,7 @@
 				if (_icyMetaSize > 0) {
 					readFunc = readMetaData;
 				} else {
-					dispatchEvent(new ICYMetaDataEvent(ICYMetaDataEvent.METADATA, meta));
+					dispatchEvent(new ICYMetaDataEvent(ICYMetaDataEvent.METADATA));
 					readFunc = readFuncContinue;
 				}
 			} else {
@@ -492,6 +341,9 @@
 			}
 		}
 		
+		protected function defaultHandler(e:Event):void {
+			dispatchEvent(e.clone());
+		}
 	}
 	
 }
