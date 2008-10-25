@@ -177,16 +177,18 @@
 		}
 		
 		public function toString():String {
-			var encoding:String = "unknown";
+			var encoding:String = "MPEG ";
 			switch(version) {
-				case MPEGFrame.MPEG_VERSION_1_0: encoding = "1.0 "; break;
-				case MPEGFrame.MPEG_VERSION_2_0: encoding = "2.0 "; break;
-				case MPEGFrame.MPEG_VERSION_2_5: encoding = "2.5 "; break;
+				case MPEGFrame.MPEG_VERSION_1_0: encoding += "1.0 "; break;
+				case MPEGFrame.MPEG_VERSION_2_0: encoding += "2.0 "; break;
+				case MPEGFrame.MPEG_VERSION_2_5: encoding += "2.5 "; break;
+				default: encoding += "?.? "; break;
 			}
 			switch(layer) {
 				case MPEGFrame.MPEG_LAYER_I: encoding += "Layer I"; break;
 				case MPEGFrame.MPEG_LAYER_II: encoding += "Layer II"; break;
 				case MPEGFrame.MPEG_LAYER_III: encoding += "Layer III"; break;
+				default: encoding += "Layer ?"; break;
 			}
 			var channel:String = "unknown";
 			switch(channelMode) {
@@ -195,7 +197,7 @@
 				case 2: channel = "Dual channel"; break;
 				case 3: channel = "Mono"; break;
 			}
-			return "[MPEGFrame " + encoding + ", " + bitrate + " Hz, " + samplingrate + "kbit/s, " + channel + "]";
+			return encoding + ", " + bitrate + " kbit/s, " + samplingrate + " Hz, " + channel + "]";
 		}
 	}
 	

@@ -84,6 +84,7 @@
 		public function resume():void {
 			if (paused && stream.connected) {
 				paused = false;
+				_mpegFrame = new MPEGFrame();
 				readFunc = readFrameHeader;
 				readLoop();
 			}
@@ -277,6 +278,7 @@
 					frameDataTmp = null;
 					mpegFrame.data = frameData;
 					if (dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true))) {
+						_mpegFrame = new MPEGFrame();
 						readFunc = readFrameHeader;
 					} else {
 						paused = true;

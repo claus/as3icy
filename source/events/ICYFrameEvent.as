@@ -22,7 +22,7 @@
 		}
 		
 		override public function toString():String {
-			return "[ICYFrameEvent " + frame.toString() + "]";
+			return "[ICYFrameEvent frame=" + frame.toString() + "]";
 		}
 
 		override public function clone():Event {
