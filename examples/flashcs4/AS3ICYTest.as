@@ -1,9 +1,9 @@
 ﻿package
 {
-	import com.aupeo.as3icy.data.MPEGFrame;
-	import com.aupeo.as3icy.ICYStream;
-	import com.aupeo.as3icy.events.ICYFrameEvent;
-	import com.aupeo.as3icy.events.ICYMetaDataEvent;
+	import com.codeazur.as3icy.data.MPEGFrame;
+	import com.codeazur.as3icy.ICYSound;
+	import com.codeazur.as3icy.events.ICYFrameEvent;
+	import com.codeazur.as3icy.events.ICYMetaDataEvent;
 	
 	import flash.display.Sprite;
 	import flash.net.*;
@@ -11,7 +11,7 @@
 	
 	public class AS3ICYTest extends Sprite
 	{
-		private var icyStream:ICYStream;
+		private var icySound:ICYSound;
 		
 		public function AS3ICYTest() 
 		{
@@ -21,23 +21,26 @@
 			//var req:URLRequest = new URLRequest("http://gffstream.ic.llnwd.net/stream/gffstream_mp3_w49a");
 			//var req:URLRequest = new URLRequest("http://gffstream.ic.llnwd.net/stream/gffstream_stream_wdr_einslive_a");
 			req.requestHeaders = [ new URLRequestHeader("Icy-Metadata", "1") ];
-			icyStream = new ICYStream();
-			icyStream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
-			icyStream.addEventListener(ICYMetaDataEvent.METADATA, metaDataHandler);
-			icyStream.addEventListener(ICYFrameEvent.FRAME, frameHandler);
-			icyStream.load(req);
+			icySound = new ICYSound();
+			icySound.addEventListener(ICYMetaDataEvent.METADATA, metaDataHandler);
+			icySound.addEventListener(ICYFrameEvent.FRAME, frameHandler);
+			CONFIG::AIR {
+				icySound.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
+			}
+			icySound.load(req);
+			icySound.play();
 		}
 		
 		protected function httpResponseStatusHandler(e:HTTPStatusEvent):void {
-			tfStationName.text = icyStream.icyName.toUpperCase();
-			tfStationDescription.text = (icyStream.icyDescription.length > 0) ? icyStream.icyDescription : "No description";
-			tfStationUrl.htmlText = "<a href='" + icyStream.icyUrl + "'>" + icyStream.icyUrl + "</a>";
-			tfServer.htmlText = "Server: <font color='#444444'>" + icyStream.icyServer + "</font>";
-			tfMetaInterval.htmlText = "Metadata interval: <font color='#444444'>" + icyStream.icyMetaInterval + "</font>";
+			tfStationName.text = icySound.icyName.toUpperCase();
+			tfStationDescription.text = (icySound.icyDescription.length > 0) ? icySound.icyDescription : "No description";
+			tfStationUrl.htmlText = "<a href='" + icySound.icyUrl + "'>" + icySound.icyUrl + "</a>";
+			tfServer.htmlText = "Server: <font color='#444444'>" + icySound.icyServer + "</font>";
+			tfMetaInterval.htmlText = "Metadata interval: <font color='#444444'>" + icySound.icyMetaInterval + "</font>";
 		}
 		
 		protected function metaDataHandler(e:ICYMetaDataEvent):void {
-			tfMetaReceived.htmlText = "Metadata received: <font color='#444444'>" + icyStream.metaDataLoaded + "</font> blocks, <font color='#444444'>" + icyStream.metaDataBytesLoaded + "</font> bytes";
+			tfMetaReceived.htmlText = "Metadata received: <font color='#444444'>" + icySound.metaDataLoaded + "</font> blocks, <font color='#444444'>" + icySound.metaDataBytesLoaded + "</font> bytes";
 			if (e.metaData.length > 0) {
 				tfNowPlayingHeadline.text = "Now playing:";
 				tfTitle.text = e.metaData.slice(13, -2).toUpperCase();
@@ -45,23 +48,23 @@
 		}
 		
 		protected function frameHandler(e:ICYFrameEvent):void {
-			tfFramesReceived.htmlText = "MPEG frames received: <font color='#444444'>" + icyStream.framesLoaded + "</font>";
+			tfFramesReceived.htmlText = "MPEG frames received: <font color='#444444'>" + icySound.framesLoaded + "</font>";
 			var encoding:String = "unknown";
-			switch(icyStream.mpegFrame.version) {
+			switch(icySound.mpegFrame.version) {
 				case MPEGFrame.MPEG_VERSION_1_0: encoding = "1.0 "; break;
 				case MPEGFrame.MPEG_VERSION_2_0: encoding = "2.0 "; break;
 				case MPEGFrame.MPEG_VERSION_2_5: encoding = "2.5 "; break;
 			}
-			switch(icyStream.mpegFrame.layer) {
+			switch(icySound.mpegFrame.layer) {
 				case MPEGFrame.MPEG_LAYER_I: encoding += "Layer I"; break;
 				case MPEGFrame.MPEG_LAYER_II: encoding += "Layer II"; break;
 				case MPEGFrame.MPEG_LAYER_III: encoding += "Layer III"; break;
 			}
 			tfMPEGEncoding.htmlText = "Encoding: <font color='#444444'>MPEG " + encoding + "</font>";
-			tfMPEGBitrate.htmlText = "Bitrate: <font color='#444444'>" + icyStream.mpegFrame.bitrate + "</font> kbit/s";
-			tfMPEGSamplingrate.htmlText = "Samplingrate: <font color='#444444'>" + icyStream.mpegFrame.samplingrate + "</font> Hz";
+			tfMPEGBitrate.htmlText = "Bitrate: <font color='#444444'>" + icySound.mpegFrame.bitrate + "</font> kbit/s";
+			tfMPEGSamplingrate.htmlText = "Samplingrate: <font color='#444444'>" + icySound.mpegFrame.samplingrate + "</font> Hz";
 			var channelMode:String = "unknown";
-			switch(icyStream.mpegFrame.channelMode) {
+			switch(icySound.mpegFrame.channelMode) {
 				case 0: channelMode = "Stereo"; break;
 				case 1: channelMode = "Joint stereo"; break;
 				case 2: channelMode = "Dual channel"; break;
@@ -75,7 +78,7 @@
 		
 		protected function enterFrameHandler(e:Event):void {
 			removeEventListener(Event.ENTER_FRAME, enterFrameHandler);
-			icyStream.resume();
+			icySound.resume();
 		}
 	}
 }

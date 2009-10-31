@@ -1,19 +1,31 @@
-﻿package com.aupeo.as3icy 
+﻿package com.codeazur.as3icy 
 {
-	import com.aupeo.as3icy.data.MPEGFrame;
-	import com.aupeo.as3icy.events.ICYFrameEvent;
-	import com.aupeo.as3icy.events.ICYMetaDataEvent;
+	import com.codeazur.as3icy.data.MPEGFrame;
+	import com.codeazur.as3icy.decoder.Decoder;
+	import com.codeazur.as3icy.decoder.OutputBuffer;
+	import com.codeazur.as3icy.events.ICYFrameEvent;
+	import com.codeazur.as3icy.events.ICYMetaDataEvent;
+	import com.codeazur.utils.StringUtils;
 	
-	import com.aupeo.utils.StringUtils;
-
+	import flash.display.Loader;
+	import flash.display.LoaderInfo;
 	import flash.events.*;
+	import flash.media.Sound;
+	import flash.media.SoundLoaderContext;
 	import flash.net.URLRequest;
 	import flash.net.URLRequestHeader;
 	import flash.net.URLStream;
+	import flash.system.LoaderContext;
 	import flash.utils.ByteArray;
+	import flash.utils.Endian;
+	import flash.utils.Timer;
 	
-	public class ICYStream extends EventDispatcher
+	public class ICYSound extends Sound
 	{
+		protected static const FRAME_BUFFER_MAX:uint = 20;
+		protected static const SAMPLE_DATA_SIZE:uint = 8192;
+		protected static const SAMPLE_DATA_BYTES:uint = (SAMPLE_DATA_SIZE << 3);
+		
 		protected var stream:URLStream;
 		
 		protected var _mpegFrame:MPEGFrame;
@@ -48,22 +60,32 @@
 		protected var read:uint = 0;
 		protected var paused:Boolean = false;
 		protected var frameDataTmp:ByteArray;
+		
+		protected var frameBuffer:Vector.<MPEGFrame>;
+		protected var sampleBuffer:ByteArray;
+		
+		protected var pauseTimer:Timer;
+		
+		protected var buffering:Boolean = true;
+		
+		protected var decoder:Decoder;
 
 		
-		public function ICYStream() 
+		public function ICYSound(request:URLRequest = null, context:SoundLoaderContext = null) 
 		{
-			stream = new URLStream();
-			stream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
-			stream.addEventListener(ProgressEvent.PROGRESS, progressHandler);
-			stream.addEventListener(Event.COMPLETE, completeHandler);
-			stream.addEventListener(IOErrorEvent.IO_ERROR, defaultHandler);
-			stream.addEventListener(SecurityErrorEvent.SECURITY_ERROR, defaultHandler);
-			stream.addEventListener(HTTPStatusEvent.HTTP_STATUS, defaultHandler);
-			stream.addEventListener(Event.OPEN, defaultHandler);
+			super(null, context);
+			pauseTimer = new Timer(25);
+			if (request != null) {
+				load(request, context);
+			}
 		}
 		
 		
-		public function load(request:URLRequest):void {
+		override public function load(request:URLRequest, context:SoundLoaderContext = null):void {
+			if (request == null) { return; }
+			frameBuffer = new Vector.<MPEGFrame>();
+			sampleBuffer = new ByteArray();
+			decoder = new Decoder(new OutputBuffer());
 			_mpegFrame = new MPEGFrame();
 			read = 0;
 			frameDataTmp = null;
@@ -74,10 +96,63 @@
 			_metaDataLoaded = 0;
 			_metaDataBytesLoaded = 0;
 			responseUrl = request.url;
+			try { stream.close(); } catch (e:Error) { }
+			stream = new URLStream();
+			stream.addEventListener(ProgressEvent.PROGRESS, progressHandler);
+			stream.addEventListener(Event.COMPLETE, completeHandler);
+			stream.addEventListener(HTTPStatusEvent.HTTP_STATUS, defaultHandler);
+			stream.addEventListener(IOErrorEvent.IO_ERROR, defaultHandler);
+			stream.addEventListener(SecurityErrorEvent.SECURITY_ERROR, defaultHandler);
+			stream.addEventListener(Event.OPEN, defaultHandler);
+			stream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
+			addEventListener(SampleDataEvent.SAMPLE_DATA, sampleDataHandler, false, int.MAX_VALUE);
 			stream.load(request);
 		}
 		
-		public function close():void {
+		protected function sampleDataHandler(e:SampleDataEvent):void {
+			var i:uint = 0;
+			var bytesToServe:uint = 0;
+			if(buffering) {
+				if(sampleBuffer.length > 705600) {
+					writeSampleData(e.data, SAMPLE_DATA_BYTES);
+					buffering = false;
+				} else {
+					for(i = 0; i < SAMPLE_DATA_SIZE; i++) {
+						e.data.writeFloat(0);
+						e.data.writeFloat(0);
+					}
+				}
+			} else {
+				var len:uint = writeSampleData(e.data, SAMPLE_DATA_BYTES);
+				if(len < SAMPLE_DATA_BYTES) {
+					var size:uint = (len >> 3);
+					for(i = 0; i < SAMPLE_DATA_SIZE - size; i++) {
+						e.data.writeFloat(0);
+						e.data.writeFloat(0);
+					}
+					buffering = true;
+				}
+			}
+		}
+		
+		protected function writeSampleData(soundBuffer:ByteArray, len:uint):uint {
+			if(len > 0 && sampleBuffer.length > 0) {
+				len = Math.min(len, sampleBuffer.length);
+				soundBuffer.writeBytes(sampleBuffer, 0, len);
+				if(len == sampleBuffer.length) {
+					sampleBuffer = new ByteArray();
+				} else {
+					var ba:ByteArray = new ByteArray();
+					ba.writeBytes(sampleBuffer, len, sampleBuffer.length - len);
+					sampleBuffer = ba; 
+				}
+			} else {
+				len = 0;
+			}
+			return len;
+		}
+
+		override public function close():void {
 			stream.close();
 		}
 		
@@ -90,6 +165,9 @@
 			}
 		}
 		
+		public function get connected():Boolean { 
+			return (stream != null) ? stream.connected : false;
+		}
 
 		public function get mpegFrame():MPEGFrame { return _mpegFrame; }
 		
@@ -276,14 +354,25 @@
 				} else {
 					_framesLoaded++;
 					frameDataTmp = null;
-					mpegFrame.data = frameData;
-					if (dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true))) {
-						_mpegFrame = new MPEGFrame();
-						readFunc = readFrameHeader;
-					} else {
-						paused = true;
-						ret = false;
+					mpegFrame.data.writeBytes(frameData);
+					mpegFrame.data.position = 0;
+
+					// decode the mpeg frame we just read
+					decoder.decodeFrame(mpegFrame);
+					var ob:Vector.<Number> = decoder.outputBuffer.getBuffer();
+					for (var i:uint = 0; i < ob.length; i++) {
+						sampleBuffer.writeFloat(ob[i]);
 					}
+					decoder.outputBuffer.clear_buffer();
+					trace(sampleBuffer.length);
+
+					if (dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true))) {
+						pauseTimer.reset();
+						pauseTimer.addEventListener(TimerEvent.TIMER, pauseTimerHandler);
+						pauseTimer.start();
+					}
+					paused = true;
+					ret = false;
 				}
 			} else {
 				read = readTmp;
@@ -314,6 +403,12 @@
 		protected function readMetaData():Boolean {
 			var ret:Boolean = true;
 			if (stream.bytesAvailable >= _icyMetaSize) {
+				/*
+				if (_icyMetaSize > 250) {
+					trace(mpegFrame);
+					throw(new Error("BOOM"));
+				}
+				*/
 				read = 0;
 				meta = stream.readUTFBytes(_icyMetaSize);
 				dispatchEvent(new ICYMetaDataEvent(ICYMetaDataEvent.METADATA, meta));
@@ -324,12 +419,35 @@
 			return ret;
 		}
 
+		/*
+		protected function swfCompleteHandler(e:Event):void {
+			var loaderInfo:LoaderInfo = e.target as LoaderInfo;
+			if(loaderInfo != null) {
+				var sound:Sound = Sound(new (loaderInfo.applicationDomain.getDefinition("SoundItem") as Class)());
+				var ba:ByteArray = new ByteArray();
+				var samplesExtracted:Number = sound.extract(ba, 1000000);
+				if(samplesExtracted > 0) {
+					sampleBuffer.position = sampleBuffer.length;
+					sampleBuffer.writeBytes(ba);
+					//trace(sound.bytesTotal + " " + sound.length + " " + samplesExtracted + " " + ba.length);
+					//trace(sound.length + " " + samplesExtracted + " " + ba.length);
+					//trace(hexDump(sampleBuffer, 0, sampleBuffer.length)); 
+				}
+			}
+		}
+		*/
+		
+		protected function pauseTimerHandler(e:TimerEvent):void {
+			pauseTimer.removeEventListener(TimerEvent.TIMER, pauseTimerHandler);
+			pauseTimer.stop();
+			resume();
+		}
 		
 		protected function processResponseHeaders(headers:Array):void {
 			for (var i:uint = 0; i < headers.length; i++) {
 				var header:URLRequestHeader = headers[i] as URLRequestHeader;
 				if (header) {
-					switch(header.name) {
+					switch(header.name.toLowerCase()) {
 						case "icy-metaint": _icyMetaInterval = parseInt(header.value); break;
 						case "icy-name": _icyName = header.value; break;
 						case "icy-description": _icyDescription = header.value; break;
@@ -337,15 +455,40 @@
 						case "icy-genre": _icyGenre = header.value; break;
 						case "icy-br": _icyBitrate = parseInt(header.value); break;
 						case "icy-pub": _icyPublish = (header.value == "1"); break;
-						case "Server": _icyServer = header.value; break;
+						case "server": _icyServer = header.value; break;
 					}
 				}
 			}
 		}
 		
 		protected function defaultHandler(e:Event):void {
+			trace("# " + e);
 			dispatchEvent(e.clone());
 		}
+
+		public  function hexDump(ba:ByteArray, start:uint, length:uint):String {
+			var deb:String = "";
+			var debHex:String = "";
+			var debAscii:String = "";
+			for (var i:int = 0; i < length; i++) {
+				if (i % 16 == 0) {
+					deb += debHex + debAscii + "\n";
+					debHex = debAscii = "";
+				}
+				var byte:uint = ba[start + i];
+				debHex += StringUtils.printf("%02X ", byte);
+				debAscii += (byte >= 0x20 && byte < 128) ? String.fromCharCode(byte) : ".";
+			}
+			if (debHex != "") {
+				var fill:uint = Math.floor(length % 16);
+				if (fill > 0) {
+					for (var j:int = 0; j < 16 - fill; j++) {
+						debHex += "   ";
+					}
+				}
+				deb += debHex + debAscii;
+			}
+			return deb;
+		}
 	}
-	
 }

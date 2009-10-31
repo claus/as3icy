@@ -1,9 +1,9 @@
-﻿package com.aupeo.as3icy.events 
+﻿package com.codeazur.as3icy.events 
 {
 	import flash.events.Event;
 	import flash.utils.ByteArray;
 
-	import com.aupeo.as3icy.data.MPEGFrame;
+	import com.codeazur.as3icy.data.MPEGFrame;
 	
 	public class ICYFrameEvent extends Event
 	{

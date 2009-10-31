@@ -1,4 +1,4 @@
-﻿package com.aupeo.as3icy.events 
+﻿package com.codeazur.as3icy.events 
 {
 	import flash.events.Event;
 	
