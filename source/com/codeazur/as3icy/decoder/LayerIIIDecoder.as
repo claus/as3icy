@@ -44,6 +44,7 @@
 		protected var sfreq:int;
 
 		protected var sfBandIndex:Vector.<SBI>;
+		protected var sfBandIndexCurrent:SBI;
 		protected var reorder_table:Vector.<Vector.<int>>;
 		
 		protected var initialized:Boolean = false;
@@ -80,8 +81,8 @@
 			y = [0];
 			v = [0];
 			w = [0];
-			filter1 = new SynthesisFilter(0, 1);
-			filter2 = new SynthesisFilter(1, 1);
+			filter1 = new SynthesisFilter(0);
+			filter2 = new SynthesisFilter(1);
 		}
 		
 		
@@ -551,11 +552,11 @@
 				// Find region boundary for long block case
 				buf = si.ch[ch].gr[gr].region0_count + 1;
 				buf1 = buf + si.ch[ch].gr[gr].region1_count + 1;
-				if (buf1 > sfBandIndex[sfreq].l.length - 1) {
-					buf1 = sfBandIndex[sfreq].l.length - 1;
+				if (buf1 > sfBandIndexCurrent.l.length - 1) {
+					buf1 = sfBandIndexCurrent.l.length - 1;
 				}
-				region1Start = sfBandIndex[sfreq].l[buf];
-				region2Start = sfBandIndex[sfreq].l[buf1]; /* MI */
+				region1Start = sfBandIndexCurrent.l[buf];
+				region2Start = sfBandIndexCurrent.l[buf1]; /* MI */
 			}
 			
 			index = 0;
@@ -600,11 +601,7 @@
 			}
 			
 			// Zero out rest
-			if (index < 576) {
-				nonzero[ch] = index;
-			} else {
-				nonzero[ch] = 576;
-			}
+			nonzero[ch] = (index < 576) ? index : 576;
 			if (index < 0) {
 				index = 0;
 			}
@@ -649,14 +646,14 @@
 			// Choose correct scalefactor band per block type, initalize boundary
 			if ((gr_info.window_switching_flag != 0) && (gr_info.block_type == 2)) {
 				if (gr_info.mixed_block_flag != 0) {
-					next_cb_boundary = sfBandIndex[sfreq].l[1]; // LONG blocks: 0,1,3
+					next_cb_boundary = sfBandIndexCurrent.l[1]; // LONG blocks: 0,1,3
 				} else {
-					cb_width = sfBandIndex[sfreq].s[1];
+					cb_width = sfBandIndexCurrent.s[1];
 					next_cb_boundary = (cb_width << 2) - cb_width;
 					cb_begin = 0;
 				}
 			} else {
-				next_cb_boundary = sfBandIndex[sfreq].l[1]; // LONG blocks: 0,1,3
+				next_cb_boundary = sfBandIndexCurrent.l[1]; // LONG blocks: 0,1,3
 			}
 
 			// Compute overall (global) scaling.
@@ -696,32 +693,32 @@
 				if (index == next_cb_boundary) { /* Adjust critical band boundary */
 					if ((gr_info.window_switching_flag != 0) && (gr_info.block_type == 2)) {
 						if (gr_info.mixed_block_flag != 0) {
-							if (index == sfBandIndex[sfreq].l[8]) {
-								next_cb_boundary = sfBandIndex[sfreq].s[4];
+							if (index == sfBandIndexCurrent.l[8]) {
+								next_cb_boundary = sfBandIndexCurrent.s[4];
 								next_cb_boundary = (next_cb_boundary << 2) -
 								next_cb_boundary;
 								cb = 3;
-								cb_width = sfBandIndex[sfreq].s[4] - sfBandIndex[sfreq].s[3];
-								cb_begin = sfBandIndex[sfreq].s[3];
+								cb_width = sfBandIndexCurrent.s[4] - sfBandIndexCurrent.s[3];
+								cb_begin = sfBandIndexCurrent.s[3];
 								cb_begin = (cb_begin << 2) - cb_begin;
-							} else if (index < sfBandIndex[sfreq].l[8]) {
-								next_cb_boundary = sfBandIndex[sfreq].l[(++cb) + 1];
+							} else if (index < sfBandIndexCurrent.l[8]) {
+								next_cb_boundary = sfBandIndexCurrent.l[(++cb) + 1];
 							} else {
-								next_cb_boundary = sfBandIndex[sfreq].s[(++cb) + 1];
+								next_cb_boundary = sfBandIndexCurrent.s[(++cb) + 1];
 								next_cb_boundary = (next_cb_boundary << 2) - next_cb_boundary;
-								cb_begin = sfBandIndex[sfreq].s[cb];
-								cb_width = sfBandIndex[sfreq].s[cb + 1] - cb_begin;
+								cb_begin = sfBandIndexCurrent.s[cb];
+								cb_width = sfBandIndexCurrent.s[cb + 1] - cb_begin;
 								cb_begin = (cb_begin << 2) - cb_begin;
 							}
 						} else {
-							next_cb_boundary = sfBandIndex[sfreq].s[(++cb) + 1];
+							next_cb_boundary = sfBandIndexCurrent.s[(++cb) + 1];
 							next_cb_boundary = (next_cb_boundary << 2) - next_cb_boundary;
-							cb_begin = sfBandIndex[sfreq].s[cb];
-							cb_width = sfBandIndex[sfreq].s[cb + 1] - cb_begin;
+							cb_begin = sfBandIndexCurrent.s[cb];
+							cb_width = sfBandIndexCurrent.s[cb + 1] - cb_begin;
 							cb_begin = (cb_begin << 2) - cb_begin;
 						}
 					} else  { // long blocks
-						next_cb_boundary = sfBandIndex[sfreq].l[(++cb) + 1];
+						next_cb_boundary = sfBandIndexCurrent.l[(++cb) + 1];
 					}
 				}
 
@@ -782,8 +779,8 @@
 					}
 					// REORDERING FOR REST SWITCHED SHORT
 					for (sfb = 3; sfb < 13; sfb++) {						   
-						sfb_start = sfBandIndex[sfreq].s[sfb];
-						sfb_lines = sfBandIndex[sfreq].s[sfb + 1] - sfb_start;
+						sfb_start = sfBandIndexCurrent.s[sfb];
+						sfb_lines = sfBandIndexCurrent.s[sfb + 1] - sfb_start;
 						var sfb_start3:int = (sfb_start << 2) - sfb_start;
 						for (freq = 0, freq3 = 0; freq < sfb_lines; freq++, freq3 += 3) {
 							src_line = sfb_start3 + freq;
@@ -862,8 +859,8 @@
 							for (j = 0; j < 3; j++) {
 								sfbcnt = 2;
 								for (sfb = 12; sfb >= 3; sfb--) {
-									i = sfBandIndex[sfreq].s[sfb];
-									lines = sfBandIndex[sfreq].s[sfb + 1] - i;
+									i = sfBandIndexCurrent.s[sfb];
+									lines = sfBandIndexCurrent.s[sfb + 1] - i;
 									i = (i << 2) - i + (j + 1) * lines - 1;
 									while (lines > 0) {
 										if (ro[1][i / 18][i % 18] != 0.0) {
@@ -880,8 +877,8 @@
 									max_sfb = sfb;
 								}
 								while (sfb < 12) {
-									temp = sfBandIndex[sfreq].s[sfb];
-									sb = sfBandIndex[sfreq].s[sfb + 1] - temp;
+									temp = sfBandIndexCurrent.s[sfb];
+									sb = sfBandIndexCurrent.s[sfb + 1] - temp;
 									i = (temp << 2) - temp + j * sb;
 									for (; sb > 0; sb--) {
 										is_pos[i] = scalefac[1].s[j][sfb];
@@ -896,11 +893,11 @@
 									}
 									sfb++;
 								}
-								sfb = sfBandIndex[sfreq].s[10];
-								sb  = sfBandIndex[sfreq].s[11] - sfb;
+								sfb = sfBandIndexCurrent.s[10];
+								sb  = sfBandIndexCurrent.s[11] - sfb;
 								sfb = (sfb << 2) - sfb + j * sb;
-								temp  = sfBandIndex[sfreq].s[11];
-								sb = sfBandIndex[sfreq].s[12] - temp;
+								temp  = sfBandIndexCurrent.s[11];
+								sb = sfBandIndexCurrent.s[12] - temp;
 								i = (temp << 2) - temp + j * sb;
 								for (; sb > 0; sb--) {
 									is_pos[i] = is_pos[sfb];
@@ -930,13 +927,13 @@
 									}
 								}
 								i = 0;
-								while (sfBandIndex[sfreq].l[i] <= sb) {
+								while (sfBandIndexCurrent.l[i] <= sb) {
 									i++;
 								}
 								sfb = i;
-								i = sfBandIndex[sfreq].l[i];
+								i = sfBandIndexCurrent.l[i];
 								for (; sfb < 8; sfb++) {
-									sb = sfBandIndex[sfreq].l[sfb + 1]-sfBandIndex[sfreq].l[sfb];
+									sb = sfBandIndexCurrent.l[sfb + 1]-sfBandIndexCurrent.l[sfb];
 									for (; sb > 0; sb--) {
 										is_pos[i] = scalefac[1].l[sfb];
 										if (is_pos[i] != 7) {
@@ -954,8 +951,8 @@
 							for (j = 0; j < 3; j++) {
 								sfbcnt = -1;
 								for (sfb = 12; sfb >= 0; sfb--) {
-									temp = sfBandIndex[sfreq].s[sfb];
-									lines = sfBandIndex[sfreq].s[sfb + 1] - temp;
+									temp = sfBandIndexCurrent.s[sfb];
+									lines = sfBandIndexCurrent.s[sfb + 1] - temp;
 									i = (temp << 2) - temp + (j+1) * lines - 1;
 									while (lines > 0) {
 										if (ro[1][i / 18][i % 18] != 0.0) {
@@ -969,8 +966,8 @@
 								}
 								sfb = sfbcnt + 1;
 								while (sfb < 12) {
-									temp = sfBandIndex[sfreq].s[sfb];
-									sb = sfBandIndex[sfreq].s[sfb + 1] - temp;
+									temp = sfBandIndexCurrent.s[sfb];
+									sb = sfBandIndexCurrent.s[sfb + 1] - temp;
 									i = (temp << 2) - temp + j * sb;
 									for (; sb > 0; sb--) {
 										is_pos[i] = scalefac[1].s[j][sfb];
@@ -985,11 +982,11 @@
 									}
 									sfb++;
 								}
-								temp = sfBandIndex[sfreq].s[10];
-								temp2= sfBandIndex[sfreq].s[11];
+								temp = sfBandIndexCurrent.s[10];
+								temp2= sfBandIndexCurrent.s[11];
 								sb = temp2 - temp;
 								sfb = (temp << 2) - temp + j * sb;
-								sb = sfBandIndex[sfreq].s[12] - temp2;
+								sb = sfBandIndexCurrent.s[12] - temp2;
 								i = (temp2 << 2) - temp2 + j * sb;
 								for (; sb > 0; sb--) {
 									is_pos[i] = is_pos[sfb];
@@ -1020,13 +1017,13 @@
 							}
 						}
 						i = 0;
-						while (sfBandIndex[sfreq].l[i] <= sb) {
+						while (sfBandIndexCurrent.l[i] <= sb) {
 							i++;
 						}
 						sfb = i;
-						i = sfBandIndex[sfreq].l[i];
+						i = sfBandIndexCurrent.l[i];
 						for (; sfb < 21; sfb++) {
-							sb = sfBandIndex[sfreq].l[sfb + 1] - sfBandIndex[sfreq].l[sfb];
+							sb = sfBandIndexCurrent.l[sfb + 1] - sfBandIndexCurrent.l[sfb];
 							for (; sb > 0; sb--) {
 								is_pos[i] = scalefac[1].l[sfb];
 								if (is_pos[i] != 7) {
@@ -1039,8 +1036,8 @@
 								i++;
 							}
 						}
-						sfb = sfBandIndex[sfreq].l[20];
-						for (sb = 576 - sfBandIndex[sfreq].l[21]; (sb > 0) && (i < 576); sb--) {
+						sfb = sfBandIndexCurrent.l[20];
+						for (sb = 576 - sfBandIndexCurrent.l[21]; (sb > 0) && (i < 576); sb--) {
 							is_pos[i] = is_pos[sfb]; // error here : i >= 576
 							if (lsf) {
 								k[0][i] = k[0][sfb];
@@ -1529,10 +1526,17 @@
 			max_gr = (currentFrame.version == MPEGFrame.MPEG_VERSION_1_0) ? 2 : 1;
 			
 			switch(currentFrame.version) {
-				case MPEGFrame.MPEG_VERSION_1_0: sfreq = currentFrame.samplingrateIndex + 3; break;
-				case MPEGFrame.MPEG_VERSION_2_5: sfreq = currentFrame.samplingrateIndex + 6; break;
-				default: sfreq = currentFrame.samplingrateIndex; break;
+				case MPEGFrame.MPEG_VERSION_1_0:
+					sfreq = currentFrame.samplingrateIndex + 3;
+					break;
+				case MPEGFrame.MPEG_VERSION_2_5:
+					sfreq = currentFrame.samplingrateIndex + 6;
+					break;
+				default: 
+					sfreq = currentFrame.samplingrateIndex; 
+					break;
 			}
+			sfBandIndexCurrent = sfBandIndex[sfreq];
 			
 			nonzero[0] = nonzero[1] = 576;
 			
