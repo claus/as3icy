@@ -187,7 +187,7 @@
 				}
 				*/
 			}
-			trace((getTimer() - t) + "ms");
+			//trace((getTimer() - t) + "ms");
 		}
 		
 		protected function get_side_info():Boolean

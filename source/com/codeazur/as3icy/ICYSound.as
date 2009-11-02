@@ -6,6 +6,8 @@
 	import com.codeazur.as3icy.events.ICYFrameEvent;
 	import com.codeazur.as3icy.events.ICYMetaDataEvent;
 	import com.codeazur.utils.StringUtils;
+	import flash.display.DisplayObject;
+	import flash.display.Sprite;
 	
 	import flash.display.Loader;
 	import flash.display.LoaderInfo;
@@ -61,20 +63,18 @@
 		protected var paused:Boolean = false;
 		protected var frameDataTmp:ByteArray;
 		
-		protected var frameBuffer:Vector.<MPEGFrame>;
 		protected var sampleBuffer:ByteArray;
-		
-		protected var pauseTimer:Timer;
 		
 		protected var buffering:Boolean = true;
 		
 		protected var decoder:Decoder;
 
+		protected var dobj:Sprite;
 		
 		public function ICYSound(request:URLRequest = null, context:SoundLoaderContext = null) 
 		{
 			super(null, context);
-			pauseTimer = new Timer(25);
+			dobj = new Sprite();
 			if (request != null) {
 				load(request, context);
 			}
@@ -83,7 +83,6 @@
 		
 		override public function load(request:URLRequest, context:SoundLoaderContext = null):void {
 			if (request == null) { return; }
-			frameBuffer = new Vector.<MPEGFrame>();
 			sampleBuffer = new ByteArray();
 			decoder = new Decoder(new OutputBuffer());
 			_mpegFrame = new MPEGFrame();
@@ -103,8 +102,10 @@
 			stream.addEventListener(HTTPStatusEvent.HTTP_STATUS, defaultHandler);
 			stream.addEventListener(IOErrorEvent.IO_ERROR, defaultHandler);
 			stream.addEventListener(SecurityErrorEvent.SECURITY_ERROR, defaultHandler);
-			stream.addEventListener(Event.OPEN, defaultHandler);
-			stream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
+			stream.addEventListener(Event.OPEN, openHandler);
+			CONFIG::AIR {
+				stream.addEventListener(HTTPStatusEvent.HTTP_RESPONSE_STATUS, httpResponseStatusHandler);
+			}
 			addEventListener(SampleDataEvent.SAMPLE_DATA, sampleDataHandler, false, int.MAX_VALUE);
 			stream.load(request);
 		}
@@ -113,7 +114,7 @@
 			var i:uint = 0;
 			var bytesToServe:uint = 0;
 			if(buffering) {
-				if(sampleBuffer.length > 705600) {
+				if(sampleBuffer.length > SAMPLE_DATA_BYTES * 2) {
 					writeSampleData(e.data, SAMPLE_DATA_BYTES);
 					buffering = false;
 				} else {
@@ -194,19 +195,26 @@
 		}
 		
 
-		protected function httpResponseStatusHandler(e:HTTPStatusEvent):void {
-			if (e.responseHeaders.length > 0) {
-				processResponseHeaders(e.responseHeaders);
-				dispatchEvent(e.clone());
-				readFunc = readFrameHeader;
-			} else {
-				// no response headers probably mean that we're dealing with
-				// fucked up non-http ICY responses (ICY 200 OK), so we have to  
-				// manually parse the headers. Well, ok then.
-				responseUrl = e.responseURL;
-				icyHeader = new ByteArray();
-				readFunc = readNonHttpIcyHeaderOmgWtfLol;
+		CONFIG::AIR {
+			protected function httpResponseStatusHandler(e:HTTPStatusEvent):void {
+				if (e.responseHeaders.length > 0) {
+					processResponseHeaders(e.responseHeaders);
+					dispatchEvent(e.clone());
+					readFunc = readFrameHeader;
+				} else {
+					// no response headers probably mean that we're dealing with
+					// fucked up non-http ICY responses (ICY 200 OK), so we have to  
+					// manually parse the headers. Well, ok then.
+					responseUrl = e.responseURL;
+					icyHeader = new ByteArray();
+					readFunc = readNonHttpIcyHeaderOmgWtfLol;
+				}
 			}
+		}
+		
+		protected function openHandler(e:Event):void {
+			dispatchEvent(e.clone());
+			readFunc = readFrameHeader;
 		}
 		
 		protected function completeHandler(e:Event):void {
@@ -229,43 +237,45 @@
 			return false;
 		}
 
-		protected function readNonHttpIcyHeaderOmgWtfLol():Boolean {
-			while (stream.bytesAvailable) {
-				var b:uint = stream.readUnsignedByte();
-				if (b == 0x0d) {
-					icyCRReceived = true;
-				} else if (b == 0x0a) {
-					icyHeader.writeByte(b);
-					icyCRLFCount++;
-				} else {
-					icyHeader.writeByte(b);
-					icyCRReceived = false;
-					icyCRLFCount = 0;
-				}
-				if (icyCRLFCount == 2) {
-					icyHeader.position = 0;
-					var responseHeaders:Array = [];
-					var header:String = icyHeader.readUTFBytes(icyHeader.length);
-					var items:Array = header.split(String.fromCharCode(0x0a));
-					for (var i:uint = 0; i < items.length; i++) {
-						var item:String = items[i];
-						var j:int = item.indexOf(":");
-						if (j > 0) {
-							var name:String = StringUtils.trim(item.substring(0, j));
-							var value:String = StringUtils.trim(item.substring(j + 1));
-							responseHeaders.push(new URLRequestHeader(name, value));
-						}
+		CONFIG::AIR {
+			protected function readNonHttpIcyHeaderOmgWtfLol():Boolean {
+				while (stream.bytesAvailable) {
+					var b:uint = stream.readUnsignedByte();
+					if (b == 0x0d) {
+						icyCRReceived = true;
+					} else if (b == 0x0a) {
+						icyHeader.writeByte(b);
+						icyCRLFCount++;
+					} else {
+						icyHeader.writeByte(b);
+						icyCRReceived = false;
+						icyCRLFCount = 0;
 					}
-					processResponseHeaders(responseHeaders);
-					var e:HTTPStatusEvent = new HTTPStatusEvent(HTTPStatusEvent.HTTP_RESPONSE_STATUS, false, false, 200);
-					e.responseHeaders = responseHeaders;
-					e.responseURL = responseUrl;
-					dispatchEvent(e);
-					readFunc = readFrameHeader;
-					break;
+					if (icyCRLFCount == 2) {
+						icyHeader.position = 0;
+						var responseHeaders:Array = [];
+						var header:String = icyHeader.readUTFBytes(icyHeader.length);
+						var items:Array = header.split(String.fromCharCode(0x0a));
+						for (var i:uint = 0; i < items.length; i++) {
+							var item:String = items[i];
+							var j:int = item.indexOf(":");
+							if (j > 0) {
+								var name:String = StringUtils.trim(item.substring(0, j));
+								var value:String = StringUtils.trim(item.substring(j + 1));
+								responseHeaders.push(new URLRequestHeader(name, value));
+							}
+						}
+						processResponseHeaders(responseHeaders);
+						var e:HTTPStatusEvent = new HTTPStatusEvent(HTTPStatusEvent.HTTP_RESPONSE_STATUS, false, false, 200);
+						e.responseHeaders = responseHeaders;
+						e.responseURL = responseUrl;
+						dispatchEvent(e);
+						readFunc = readFrameHeader;
+						break;
+					}
 				}
+				return true;
 			}
-			return true;
 		}
 		
 		protected function readFrameHeader():Boolean {
@@ -359,20 +369,24 @@
 
 					// decode the mpeg frame we just read
 					decoder.decodeFrame(mpegFrame);
+					
 					var ob:Vector.<Number> = decoder.outputBuffer.getBuffer();
 					for (var i:uint = 0; i < ob.length; i++) {
 						sampleBuffer.writeFloat(ob[i]);
 					}
 					decoder.outputBuffer.clear_buffer();
-					trace(sampleBuffer.length);
 
-					if (dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true))) {
-						pauseTimer.reset();
-						pauseTimer.addEventListener(TimerEvent.TIMER, pauseTimerHandler);
-						pauseTimer.start();
+					dispatchEvent(new ICYFrameEvent(ICYFrameEvent.FRAME, mpegFrame, false, true));
+
+					if (sampleBuffer.length > SAMPLE_DATA_BYTES * 2) {
+						dobj.addEventListener(Event.ENTER_FRAME, enterFrameHandler);
+						paused = true;
+						ret = false;
+					} else {
+						_mpegFrame = new MPEGFrame();
+						readFunc = readFrameHeader;
+						ret = true;
 					}
-					paused = true;
-					ret = false;
 				}
 			} else {
 				read = readTmp;
@@ -419,50 +433,32 @@
 			return ret;
 		}
 
-		/*
-		protected function swfCompleteHandler(e:Event):void {
-			var loaderInfo:LoaderInfo = e.target as LoaderInfo;
-			if(loaderInfo != null) {
-				var sound:Sound = Sound(new (loaderInfo.applicationDomain.getDefinition("SoundItem") as Class)());
-				var ba:ByteArray = new ByteArray();
-				var samplesExtracted:Number = sound.extract(ba, 1000000);
-				if(samplesExtracted > 0) {
-					sampleBuffer.position = sampleBuffer.length;
-					sampleBuffer.writeBytes(ba);
-					//trace(sound.bytesTotal + " " + sound.length + " " + samplesExtracted + " " + ba.length);
-					//trace(sound.length + " " + samplesExtracted + " " + ba.length);
-					//trace(hexDump(sampleBuffer, 0, sampleBuffer.length)); 
-				}
-			}
-		}
-		*/
-		
-		protected function pauseTimerHandler(e:TimerEvent):void {
-			pauseTimer.removeEventListener(TimerEvent.TIMER, pauseTimerHandler);
-			pauseTimer.stop();
+		protected function enterFrameHandler(e:Event):void {
+			dobj.removeEventListener(Event.ENTER_FRAME, enterFrameHandler);
 			resume();
 		}
 		
-		protected function processResponseHeaders(headers:Array):void {
-			for (var i:uint = 0; i < headers.length; i++) {
-				var header:URLRequestHeader = headers[i] as URLRequestHeader;
-				if (header) {
-					switch(header.name.toLowerCase()) {
-						case "icy-metaint": _icyMetaInterval = parseInt(header.value); break;
-						case "icy-name": _icyName = header.value; break;
-						case "icy-description": _icyDescription = header.value; break;
-						case "icy-url": _icyUrl = header.value; break;
-						case "icy-genre": _icyGenre = header.value; break;
-						case "icy-br": _icyBitrate = parseInt(header.value); break;
-						case "icy-pub": _icyPublish = (header.value == "1"); break;
-						case "server": _icyServer = header.value; break;
+		CONFIG::AIR {
+			protected function processResponseHeaders(headers:Array):void {
+				for (var i:uint = 0; i < headers.length; i++) {
+					var header:URLRequestHeader = headers[i] as URLRequestHeader;
+					if (header) {
+						switch(header.name.toLowerCase()) {
+							case "icy-metaint": _icyMetaInterval = parseInt(header.value); break;
+							case "icy-name": _icyName = header.value; break;
+							case "icy-description": _icyDescription = header.value; break;
+							case "icy-url": _icyUrl = header.value; break;
+							case "icy-genre": _icyGenre = header.value; break;
+							case "icy-br": _icyBitrate = parseInt(header.value); break;
+							case "icy-pub": _icyPublish = (header.value == "1"); break;
+							case "server": _icyServer = header.value; break;
+						}
 					}
 				}
 			}
 		}
 		
 		protected function defaultHandler(e:Event):void {
-			trace("# " + e);
 			dispatchEvent(e.clone());
 		}
 
