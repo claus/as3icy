@@ -10,18 +10,16 @@
 		protected var actual_write_pos:int;
 		protected var samples:Vector.<Number>;
 		protected var channel:int;
-		protected var scalefactor:Number;
 		protected var _tmpOut:Vector.<Number>;
 		//private float[] eq;
 
-		public function SynthesisFilter(channelnumber:int, factor:Number /*, eq0:Vector.<Number>*/)
+		public function SynthesisFilter(channelnumber:int /*, eq0:Vector.<Number>*/)
 		{
 			v1 = new Vector.<Number>(512, true);
 			v2 = new Vector.<Number>(512, true);
 			samples = new Vector.<Number>(32);
 			_tmpOut = new Vector.<Number>(32);
 			channel = channelnumber;
-			scalefactor = factor;
 			reset();
 		}
 
@@ -430,7 +428,7 @@
 					vp[3 + dvp] * dp[13] +
 					vp[2 + dvp] * dp[14] +
 					vp[1 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -457,7 +455,7 @@
 					vp[4 + dvp] * dp[13] +
 					vp[3 + dvp] * dp[14] +
 					vp[2 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -484,7 +482,7 @@
 					vp[5 + dvp] * dp[13] +
 					vp[4 + dvp] * dp[14] +
 					vp[3 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -511,7 +509,7 @@
 					vp[6 + dvp] * dp[13] +
 					vp[5 + dvp] * dp[14] +
 					vp[4 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -538,7 +536,7 @@
 					vp[7 + dvp] * dp[13] +
 					vp[6 + dvp] * dp[14] +
 					vp[5 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -565,7 +563,7 @@
 					vp[8 + dvp] * dp[13] +
 					vp[7 + dvp] * dp[14] +
 					vp[6 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -592,7 +590,7 @@
 					vp[9 + dvp] * dp[13] +
 					vp[8 + dvp] * dp[14] +
 					vp[7 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -619,7 +617,7 @@
 					vp[10 + dvp] * dp[13] +
 					vp[9 + dvp] * dp[14] +
 					vp[8 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -646,7 +644,7 @@
 					vp[11 + dvp] * dp[13] +
 					vp[10 + dvp] * dp[14] +
 					vp[9 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -673,7 +671,7 @@
 					vp[12 + dvp] * dp[13] +
 					vp[11 + dvp] * dp[14] +
 					vp[10 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -700,7 +698,7 @@
 					vp[13 + dvp] * dp[13] +
 					vp[12 + dvp] * dp[14] +
 					vp[11 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -727,7 +725,7 @@
 					vp[14 + dvp] * dp[13] +
 					vp[13 + dvp] * dp[14] +
 					vp[12 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -754,7 +752,7 @@
 					vp[15 + dvp] * dp[13] +
 					vp[14 + dvp] * dp[14] +
 					vp[13 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -781,7 +779,7 @@
 					vp[0 + dvp] * dp[13] +
 					vp[15 + dvp] * dp[14] +
 					vp[14 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -808,7 +806,7 @@
 					vp[1 + dvp] * dp[13] +
 					vp[0 + dvp] * dp[14] +
 					vp[15 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
@@ -835,7 +833,7 @@
 					vp[2 + dvp] * dp[13] +
 					vp[1 + dvp] * dp[14] +
 					vp[0 + dvp] * dp[15]
-				) * scalefactor;
+				);
 				dvp += 16;
 			}
 		}
