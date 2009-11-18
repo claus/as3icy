@@ -36,7 +36,8 @@
 		}
 
 		public function input_samples(s:Vector.<Number>):void {
-			for (var i:int = 31; i >= 0; i--) {		
+			var i:int;
+			for (i = 31; i >= 0; i--) {		
 				samples[i] = s[i]; /* * eq[i]*/
 			}
 		}
@@ -48,7 +49,8 @@
 			actual_v = (actual_v == v1) ? v2 : v1;
 			// MDM: this may not be necessary. The Layer III decoder always
 			// outputs 32 subband samples, but I haven't checked layer I & II.
-			for (var i:int = 0; i < 32; i++) { 
+			var i:int;
+			for (i = 0; i < 32; ++i) { 
 				samples[i] = 0.0;
 			}
 		}
@@ -409,7 +411,8 @@
 		protected function compute_pcm_samples0():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; ++i) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[0 + dvp] * dp[0] +
@@ -436,7 +439,8 @@
 		protected function compute_pcm_samples1():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[1 + dvp] * dp[0] +
@@ -463,7 +467,8 @@
 		protected function compute_pcm_samples2():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[2 + dvp] * dp[0] +
@@ -490,7 +495,8 @@
 		protected function compute_pcm_samples3():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[3 + dvp] * dp[0] +
@@ -517,7 +523,8 @@
 		protected function compute_pcm_samples4():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[4 + dvp] * dp[0] +
@@ -544,7 +551,8 @@
 		protected function compute_pcm_samples5():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[5 + dvp] * dp[0] +
@@ -571,7 +579,8 @@
 		protected function compute_pcm_samples6():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[6 + dvp] * dp[0] +
@@ -598,7 +607,8 @@
 		protected function compute_pcm_samples7():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[7 + dvp] * dp[0] +
@@ -625,7 +635,8 @@
 		protected function compute_pcm_samples8():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[8 + dvp] * dp[0] +
@@ -652,7 +663,8 @@
 		protected function compute_pcm_samples9():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[9 + dvp] * dp[0] +
@@ -679,7 +691,8 @@
 		protected function compute_pcm_samples10():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[10 + dvp] * dp[0] +
@@ -706,7 +719,8 @@
 		protected function compute_pcm_samples11():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[11 + dvp] * dp[0] +
@@ -733,7 +747,8 @@
 		protected function compute_pcm_samples12():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[12 + dvp] * dp[0] +
@@ -760,7 +775,8 @@
 		protected function compute_pcm_samples13():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[13 + dvp] * dp[0] +
@@ -787,7 +803,8 @@
 		protected function compute_pcm_samples14():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[14 + dvp] * dp[0] +
@@ -814,7 +831,8 @@
 		protected function compute_pcm_samples15():void {
 			var vp:Vector.<Number> = actual_v;	
 			var dvp:int = 0;
-			for(var i:int = 0; i < 32; i++) {
+			var i:int;
+			for(i = 0; i < 32; i++) {
 				var dp:Vector.<Number> = d16[i];
 				_tmpOut[i] = (
 					vp[15 + dvp] * dp[0] +
@@ -1006,13 +1024,27 @@
 		protected static function dSplit():Vector.<Vector.<Number>> {
 			var dRes:Vector.<Vector.<Number>> = new Vector.<Vector.<Number>>(32, true);
 			var dTmp:Vector.<Number>;
-			for (var i:uint = 0; i < 32; i++) {
+			var i:int, j:int;
+			for (i = 0; i < 32; i++) {
 				var start:uint = i << 4;
-				dTmp = new Vector.<Number>(16, true);
-				for (var j:uint = 0; j < 16; j++) {
-					dTmp[j] = d[start + j];
-				}
-				dRes[i] = dTmp;
+				dRes[i] = Vector.<Number>([
+					d[start + 0],
+					d[start + 1],
+					d[start + 2],
+					d[start + 3],
+					d[start + 4],
+					d[start + 5],
+					d[start + 6],
+					d[start + 7],
+					d[start + 8],
+					d[start + 9],
+					d[start + 10],
+					d[start + 11],
+					d[start + 12],
+					d[start + 13],
+					d[start + 14],
+					d[start + 15]
+				]);
 			}
 			return dRes;
 		}

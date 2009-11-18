@@ -40,7 +40,7 @@
 		* note! for counta,countb -the 4 bit value is returned in y,
 		* discard x.
 		*/
-		public static function huffman_decoder(h:HuffCodeTab, x:Array, y:Array, v:Array, w:Array, br:BitReserve):int
+		public static function huffman_decoder(h:HuffCodeTab, res:HuffResult, br:BitReserve):int
 		{
 			// array of all huffcodtable headers
 			// 0..31 Huffman code table 0..31
@@ -58,7 +58,7 @@
 
 			// Table 0 needs no bits
 			if (h.treelen == 0) { 
-				x[0] = y[0] = 0;
+				res.x = res.y = 0;
 				return 0;
 			}
 
@@ -67,8 +67,8 @@
 			{
 				if (h.val[point][0] == 0) {
 					// End of tree
-					x[0] = h.val[point][1] >>> 4;
-					y[0] = h.val[point][1] & 0xf;
+					res.x = h.val[point][1] >>> 4;
+					res.y = h.val[point][1] & 0xf;
 					error = 0;
 					break;
 				}
@@ -89,30 +89,30 @@
 
 			// Process sign encodings for quadruples tables.
 			if (h.tablename0 == '3' && (h.tablename1 == '2' || h.tablename1 == '3')) {
-				v[0] = (y[0] >> 3) & 1;
-				w[0] = (y[0] >> 2) & 1;
-				x[0] = (y[0] >> 1) & 1;
-				y[0] = y[0] & 1;
+				res.v = (res.y >> 3) & 1;
+				res.w = (res.y >> 2) & 1;
+				res.x = (res.y >> 1) & 1;
+				res.y = res.y & 1;
 				// v, w, x and y are reversed in the bitstream.
 				// switch them around to make test bistream work.
-				if (v[0] != 0) {
+				if (res.v != 0) {
 					if (br.hget1bit() != 0) {
-						v[0] = -v[0];
+						res.v = -res.v;
 					}
 				}
-				if (w[0] != 0) {
+				if (res.w != 0) {
 					if (br.hget1bit() != 0) {
-						w[0] = -w[0];
+						res.w = -res.w;
 					}
 				}
-				if (x[0] != 0) {
+				if (res.x != 0) {
 					if (br.hget1bit() != 0) {
-						x[0] = -x[0];
+						res.x = -res.x;
 					}
 				}
-				if (y[0] != 0) {
+				if (res.y != 0) {
 					if (br.hget1bit() != 0) {
-						y[0] = -y[0];
+						res.y = -res.y;
 					}
 				}
 			} else {
@@ -120,23 +120,23 @@
 				// x and y are reversed in the test bitstream.
 				// Reverse x and y here to make test bitstream work.
 				if (h.linbits != 0) {
-					if (h.xlen - 1 == x[0]) {
-						x[0] += br.hgetbits(h.linbits);
+					if (h.xlen - 1 == res.x) {
+						res.x += br.hgetbits(h.linbits);
 					}
 				}
-				if (x[0] != 0) {
+				if (res.x != 0) {
 					if (br.hget1bit() != 0) {
-						x[0] = -x[0];
+						res.x = -res.x;
 					}
 				}
 				if (h.linbits != 0) {
-					if (h.ylen - 1 == y[0]) {
-						y[0] += br.hgetbits(h.linbits);
+					if (h.ylen - 1 == res.y) {
+						res.y += br.hgetbits(h.linbits);
 					}
 				}
-				if (y[0] != 0) {
+				if (res.y != 0) {
 					if (br.hget1bit() != 0) {
-						y[0] = -y[0];
+						res.y = -res.y;
 					}
 				}
 			}
@@ -534,49 +534,5 @@
 			new HuffCodeTab("32 ", 1, 16, 0, 0, -1, null, null, ValTab32, 31),
 			new HuffCodeTab("33 ", 1, 16, 0, 0, -1, null, null, ValTab33, 31)
 		]);
-		
-		/*
-		protected static function createHuffCodeTabs():Vector.<HuffCodeTab>
-		{
-			var ht:Vector.<HuffCodeTab> = new Vector.<HuffCodeTab>();
-			
-			ht[0] = new HuffCodeTab("0  ", 0, 0, 0, 0, -1, null, null, ValTab0, 0);
-			ht[1] = new HuffCodeTab("1  ", 2, 2, 0, 0, -1, null, null, ValTab1, 7);
-			ht[2] = new HuffCodeTab("2  ", 3, 3, 0, 0, -1, null, null, ValTab2, 17);
-			ht[3] = new HuffCodeTab("3  ", 3, 3, 0, 0, -1, null, null, ValTab3, 17);
-			ht[4] = new HuffCodeTab("4  ", 0, 0, 0, 0, -1, null, null, ValTab4, 0);    
-			ht[5] = new HuffCodeTab("5  ", 4, 4, 0, 0, -1, null, null, ValTab5, 31);
-			ht[6] = new HuffCodeTab("6  ", 4, 4, 0, 0, -1, null, null, ValTab6, 31);
-			ht[7] = new HuffCodeTab("7  ", 6, 6, 0, 0, -1, null, null, ValTab7, 71);
-			ht[8] = new HuffCodeTab("8  ", 6, 6, 0, 0, -1, null, null, ValTab8, 71);
-			ht[9] = new HuffCodeTab("9  ", 6, 6, 0, 0, -1, null, null, ValTab9, 71);
-			ht[10] = new HuffCodeTab("10 ", 8, 8, 0, 0, -1, null, null, ValTab10, 127);  
-			ht[11] = new HuffCodeTab("11 ", 8, 8, 0, 0, -1, null, null, ValTab11, 127);
-			ht[12] = new HuffCodeTab("12 ", 8, 8, 0, 0, -1, null, null, ValTab12, 127);
-			ht[13] = new HuffCodeTab("13 ", 16, 16, 0, 0, -1, null, null, ValTab13, 511);
-			ht[14] = new HuffCodeTab("14 ", 0, 0, 0, 0, -1, null, null, ValTab14, 0);
-			ht[15] = new HuffCodeTab("15 ", 16, 16, 0, 0, -1, null, null, ValTab15, 511);
-			ht[16] = new HuffCodeTab("16 ", 16, 16, 1, 1, -1, null, null, ValTab16, 511);
-			ht[17] = new HuffCodeTab("17 ", 16, 16, 2, 3, 16, null, null, ValTab16, 511);
-			ht[18] = new HuffCodeTab("18 ", 16, 16, 3, 7, 16, null, null, ValTab16, 511);
-			ht[19] = new HuffCodeTab("19 ", 16, 16, 4, 15, 16, null, null, ValTab16, 511);
-			ht[20] = new HuffCodeTab("20 ", 16, 16, 6, 63, 16, null, null, ValTab16, 511);
-			ht[21] = new HuffCodeTab("21 ", 16, 16, 8, 255, 16, null, null, ValTab16, 511);
-			ht[22] = new HuffCodeTab("22 ", 16, 16, 10, 1023, 16, null, null, ValTab16, 511);
-			ht[23] = new HuffCodeTab("23 ", 16, 16, 13, 8191, 16, null, null, ValTab16, 511);
-			ht[24] = new HuffCodeTab("24 ", 16, 16, 4, 15, -1, null, null, ValTab24, 512);
-			ht[25] = new HuffCodeTab("25 ", 16, 16, 5, 31, 24, null, null, ValTab24, 512);
-			ht[26] = new HuffCodeTab("26 ", 16, 16, 6, 63, 24, null, null, ValTab24, 512);
-			ht[27] = new HuffCodeTab("27 ", 16, 16, 7, 127, 24, null, null, ValTab24, 512);
-			ht[28] = new HuffCodeTab("28 ", 16, 16, 8, 255, 24, null, null, ValTab24, 512);  
-			ht[29] = new HuffCodeTab("29 ", 16, 16, 9, 511, 24, null, null, ValTab24, 512);
-			ht[30] = new HuffCodeTab("30 ", 16, 16, 11, 2047, 24, null, null, ValTab24, 512);
-			ht[31] = new HuffCodeTab("31 ", 16, 16, 13, 8191, 24, null, null, ValTab24, 512);
-			ht[32] = new HuffCodeTab("32 ", 1, 16, 0, 0, -1, null, null, ValTab32, 31);
-			ht[33] = new HuffCodeTab("33 ", 1, 16, 0, 0, -1, null, null, ValTab33, 31);
-			
-			return ht;
-		}
-		*/
 	}
 }

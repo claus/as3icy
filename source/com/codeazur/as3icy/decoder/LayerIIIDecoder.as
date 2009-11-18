@@ -61,10 +61,7 @@
 		protected var rawout:Vector.<Number>;
 		protected var samples1:Vector.<Number>;
 		protected var samples2:Vector.<Number>;
-		protected var x:Array;
-		protected var y:Array;
-		protected var v:Array;
-		protected var w:Array;
+		protected var huffRes:HuffResult;
 		
 		
 		public function LayerIIIDecoder(outputBuffer:OutputBuffer)
@@ -77,10 +74,7 @@
 			rawout = new Vector.<Number>(36, true);
 			samples1 = new Vector.<Number>(32, true);
 			samples2 = new Vector.<Number>(32, true);
-			x = [0];
-			y = [0];
-			v = [0];
-			w = [0];
+			huffRes = new HuffResult();
 			filter1 = new SynthesisFilter(0);
 			filter2 = new SynthesisFilter(1);
 		}
@@ -179,14 +173,6 @@
 						}
 					}
 				}
-				/*
-				if (++__c == 100) {
-					for (var xx:uint = 0; xx < samples1.length; xx++) {
-						trace(xx, samples1[xx], samples2[xx]);
-					}
-					throw(new Error("stop"));
-				}
-				*/
 			}
 			//trace((getTimer() - t) + "ms");
 		}
@@ -425,22 +411,22 @@
 			}
 			if (!(((mode_ext == 1) || (mode_ext == 3)) && (ch == 1))) {
 				if (scalefac_comp < 400) {
-					new_slen[0] = (scalefac_comp >>> 4) / 5 ;
-					new_slen[1] = (scalefac_comp >>> 4) % 5 ;
-					new_slen[2] = (scalefac_comp & 0xF) >>> 2 ;
+					new_slen[0] = (scalefac_comp >>> 4) / 5;
+					new_slen[1] = (scalefac_comp >>> 4) % 5;
+					new_slen[2] = (scalefac_comp & 0xF) >>> 2;
 					new_slen[3] = (scalefac_comp & 3);
 					si.ch[ch].gr[gr].preflag = 0;
 					blocknumber = 0;
 				} else if (scalefac_comp  < 500) {
-					new_slen[0] = ((scalefac_comp - 400) >>> 2) / 5 ;
-					new_slen[1] = ((scalefac_comp - 400) >>> 2) % 5 ;
-					new_slen[2] = (scalefac_comp - 400 ) & 3 ;
+					new_slen[0] = ((scalefac_comp - 400) >>> 2) / 5;
+					new_slen[1] = ((scalefac_comp - 400) >>> 2) % 5;
+					new_slen[2] = (scalefac_comp - 400 ) & 3;
 					new_slen[3] = 0;
 					si.ch[ch].gr[gr].preflag = 0;
 					blocknumber = 1;
 				} else if (scalefac_comp < 512) {
-					new_slen[0] = (scalefac_comp - 500 ) / 3 ;
-					new_slen[1] = (scalefac_comp - 500)  % 3 ;
+					new_slen[0] = (scalefac_comp - 500 ) / 3;
+					new_slen[1] = (scalefac_comp - 500)  % 3;
 					new_slen[2] = 0;
 					new_slen[3] = 0;
 					si.ch[ch].gr[gr].preflag = 1;
@@ -450,22 +436,22 @@
 			if ((((mode_ext == 1) || (mode_ext == 3)) && (ch == 1))) {
 				int_scalefac_comp = scalefac_comp >>> 1;
 				if (int_scalefac_comp < 180) {
-					new_slen[0] = int_scalefac_comp / 36 ;
-					new_slen[1] = (int_scalefac_comp % 36 ) / 6 ;
+					new_slen[0] = int_scalefac_comp / 36;
+					new_slen[1] = (int_scalefac_comp % 36 ) / 6;
 					new_slen[2] = (int_scalefac_comp % 36) % 6;
 					new_slen[3] = 0;
 					si.ch[ch].gr[gr].preflag = 0;
 					blocknumber = 3;
 				} else if (int_scalefac_comp < 244) {
-					new_slen[0] = ((int_scalefac_comp - 180 )  & 0x3F) >>> 4 ;
-					new_slen[1] = ((int_scalefac_comp - 180) & 0xF) >>> 2 ;
-					new_slen[2] = (int_scalefac_comp - 180 ) & 3 ;
+					new_slen[0] = ((int_scalefac_comp - 180 )  & 0x3F) >>> 4;
+					new_slen[1] = ((int_scalefac_comp - 180) & 0xF) >>> 2;
+					new_slen[2] = (int_scalefac_comp - 180 ) & 3;
 					new_slen[3] = 0;
 					si.ch[ch].gr[gr].preflag = 0;
 					blocknumber = 4;
 				} else if (int_scalefac_comp < 255) {
-					new_slen[0] = (int_scalefac_comp - 244 ) / 3 ;
-					new_slen[1] = (int_scalefac_comp - 244 )  % 3 ;
+					new_slen[0] = (int_scalefac_comp - 244 ) / 3;
+					new_slen[1] = (int_scalefac_comp - 244 )  % 3;
 					new_slen[2] = 0;
 					new_slen[3] = 0;
 					si.ch[ch].gr[gr].preflag = 0;
@@ -528,11 +514,6 @@
 
 		protected function huffman_decode(ch:int, gr:int):void
 		{
-			x[0] = 0;
-			y[0] = 0;
-			v[0] = 0;
-			w[0] = 0;
-			
 			var part2_3_end:int = part2_start + si.ch[ch].gr[gr].part2_3_length;
 			var num_bits:int;
 			var region1Start:int;
@@ -542,6 +523,8 @@
 			var buf1:int;
 			var h:HuffCodeTab;
 
+			huffRes.reset();
+			
 			// Find region boundary for short block case
 			if (((si.ch[ch].gr[gr].window_switching_flag) != 0) && (si.ch[ch].gr[gr].block_type == 2)) {
 				// Region2.
@@ -571,22 +554,22 @@
 				} else {
 					h = HuffCodeTab.ht[si.ch[ch].gr[gr].table_select[2]];
 				}
-				HuffCodeTab.huffman_decoder(h, x, y, v, w, br);
-				is_1d[index++] = x[0];
-				is_1d[index++] = y[0];
-				checkSumHuff = checkSumHuff + x[0] + y[0];
+				HuffCodeTab.huffman_decoder(h, huffRes, br);
+				is_1d[index++] = huffRes.x;
+				is_1d[index++] = huffRes.y;
+				checkSumHuff = checkSumHuff + huffRes.x + huffRes.y;
 			}
 			
 			// Read count1 area
 			h = HuffCodeTab.ht[si.ch[ch].gr[gr].count1table_select + 32];
 			num_bits = br.hsstell;
 			while ((num_bits < part2_3_end) && (index < 576)) {
-				HuffCodeTab.huffman_decoder(h, x, y, v, w, br);
-				is_1d[index++] = v[0];
-				is_1d[index++] = w[0];
-				is_1d[index++] = x[0];
-				is_1d[index++] = y[0];
-				checkSumHuff = checkSumHuff + v[0] + w[0] + x[0] + y[0];
+				HuffCodeTab.huffman_decoder(h, huffRes, br);
+				is_1d[index++] = huffRes.v;
+				is_1d[index++] = huffRes.w;
+				is_1d[index++] = huffRes.x;
+				is_1d[index++] = huffRes.y;
+				checkSumHuff = checkSumHuff + huffRes.v + huffRes.w + huffRes.x + huffRes.y;
 				num_bits = br.hsstell;
 			}
 			if (num_bits > part2_3_end) {

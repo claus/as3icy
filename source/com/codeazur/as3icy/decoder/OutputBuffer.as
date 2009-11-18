@@ -38,8 +38,8 @@
 		public function appendSamples(channel:uint, f:Vector.<Number>):void {
 			var pos:uint = bufferp[channel];
 			var fs:Number;
-			for (var i:uint = 0; i < 32; ) {
-				fs = f[i++];
+			for (var i:uint = 0; i < 32; ++i) {
+				fs = f[i];
 				fs = (fs > 1.0 ? 1.0 : (fs < -1.0 ? -1.0 : fs));
 				buffer[pos] = fs;
 				pos += channels;
